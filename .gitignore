@@ -1,0 +1,22 @@
+/node_modules
+.env
+.env.local
+.env.*.local
+*.log
+.DS_Store
+
+# Foundry
+/contracts/out
+/contracts/cache
+/contracts/broadcast
+/contracts/lib
+
+# Frontend build
+/frontend/.next
+/frontend/dist
+/frontend/out
+
+# Rust (if used later)
+/target
+Cargo.lock
+**/*.rs.bk
