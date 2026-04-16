@@ -1,0 +1,47 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    env:
+      DEPLOY_HOST: jsong@10.150.254.110
+      DEPLOY_DIR: /home/jsong/MetaStake
+      PORT: "3400"
+
+    steps:
+      - name: Deploy to demo server
+        run: |
+          ssh $DEPLOY_HOST bash -s << 'SCRIPT'
+          set -e
+
+          # Clone or pull
+          if [ ! -d ${{ env.DEPLOY_DIR }} ]; then
+            git clone https://github.com/jsong1230/MetaStake.git ${{ env.DEPLOY_DIR }}
+          fi
+          cd ${{ env.DEPLOY_DIR }}
+          git fetch origin main
+          git reset --hard origin/main
+
+          # Build frontend
+          cd frontend
+          npm install --production=false
+          PORT=${{ env.PORT }} npm run build
+
+          # PM2 start or restart
+          if pm2 describe metastake > /dev/null 2>&1; then
+            PORT=${{ env.PORT }} pm2 restart metastake --update-env
+          else
+            PORT=${{ env.PORT }} pm2 start npm --name metastake -- start
+          fi
+
+          pm2 save
+          echo "MetaStake deployed on port ${{ env.PORT }}"
+          SCRIPT
