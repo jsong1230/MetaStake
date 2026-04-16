@@ -5,8 +5,9 @@ import {Script, console} from "forge-std/Script.sol";
 import {MetaStake} from "../src/MetaStake.sol";
 import {FeeDistributor} from "../src/FeeDistributor.sol";
 import {Governance} from "../src/Governance.sol";
+import {OperatorRegistry} from "../src/OperatorRegistry.sol";
 
-/// @notice Deploy MetaStake + FeeDistributor + Governance to Metadium testnet.
+/// @notice Deploy full MetaStake suite to Metadium testnet.
 ///
 /// Usage:
 ///   forge script script/Deploy.s.sol:DeployMetaStake \
@@ -16,6 +17,7 @@ import {Governance} from "../src/Governance.sol";
 contract DeployMetaStake is Script {
     function run() external {
         uint256 maxLock = vm.envOr("MAX_LOCK", uint256(365 days));
+        address deployer = msg.sender;
 
         vm.startBroadcast();
 
@@ -25,15 +27,22 @@ contract DeployMetaStake is Script {
             staking_: address(staking),
             votingDelay_: 1 days,
             votingPeriod_: 3 days,
-            proposalThreshold_: 1 ether, // 1 veMETA
-            quorum_: 1 ether // 1 veMETA total votes
+            proposalThreshold_: 1 ether,
+            quorum_: 1 ether
         });
+        OperatorRegistry operators = new OperatorRegistry(deployer); // deployer as initial treasury
+
+        // Register initial services
+        operators.registerService("zkBridge Relayer", deployer, 10 ether, 1000); // 10% slash
+        operators.registerService("Dispute Resolver", deployer, 20 ether, 2000); // 20% slash
+        operators.registerService("Agent Verifier", deployer, 10 ether, 500); // 5% slash
 
         vm.stopBroadcast();
 
-        console.log("MetaStake deployed at:", address(staking));
-        console.log("FeeDistributor deployed at:", address(distributor));
-        console.log("Governance deployed at:", address(gov));
-        console.log("  MAX_LOCK:", maxLock, "seconds");
+        console.log("=== MetaStake Suite Deployed ===");
+        console.log("MetaStake:        ", address(staking));
+        console.log("FeeDistributor:   ", address(distributor));
+        console.log("Governance:       ", address(gov));
+        console.log("OperatorRegistry: ", address(operators));
     }
 }
