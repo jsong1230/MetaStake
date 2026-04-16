@@ -13,9 +13,12 @@ B + C 하이브리드
 - Frontend: Next.js (TBD)
 - Target: Metadium testnet (chainId 12)
 
-## 디렉토리 (계획)
-- `contracts/` — Foundry 스마트 컨트랙트
-- `frontend/` — Next.js 스테이킹 UI
+## 디렉토리
+- `contracts/` — Foundry 프로젝트
+  - `src/` — 스마트 컨트랙트 (MetaStake, FeeDistributor, Governance, OperatorRegistry)
+  - `test/` — Foundry 테스트
+  - `script/` — 배포 스크립트 (Deploy.s.sol)
+  - `lib/` — 의존성 (forge-std, openzeppelin-contracts)
 - `docs/` — 설계 문서
 
 ## 생태계 연동

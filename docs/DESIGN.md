@@ -161,6 +161,32 @@ Curve 방식을 채택하되 단순화:
                     veMETA 홀더에 분배
 ```
 
+## Deployed Contracts (Testnet)
+
+Metadium testnet (chainId 12, RPC: `https://api.metadium.com/dev`)
+
+| 컨트랙트 | 주소 |
+|---------|------|
+| MetaStake | `0x9a1d09D75a036c2137b89a8C767e18e77d82ff69` |
+| FeeDistributor | `0x26541F01D2fDd70da17a2FEC9e6B23ebe51ed502` |
+| Governance | `0x616dE1bE241508Fcc35ba2813883038B9494C90A` |
+| OperatorRegistry | `0x19F412E4FB526b3eb89e0bd62A06D2184D915B89` |
+
+### 등록된 서비스 (OperatorRegistry)
+
+| ID | 서비스 | minStake | slash 비율 |
+|----|--------|----------|-----------|
+| 0 | zkBridge Relayer | 10 META | 10% |
+| 1 | Dispute Resolver | 20 META | 20% |
+| 2 | Agent Verifier | 10 META | 5% |
+
+### Governance 파라미터
+
+- votingDelay: 1 day
+- votingPeriod: 3 days
+- threshold: 1 veMETA
+- quorum: 1 veMETA
+
 ## 참고
 
 - [Curve veCRV whitepaper](https://resources.curve.fi/base-features/understanding-crv)
