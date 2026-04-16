@@ -1,20 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /// @title MetaStake — veMETA governance staking
-/// @notice Lock META tokens to receive non-transferable veMETA voting power.
+/// @notice Lock native META to receive non-transferable veMETA voting power.
 ///         veMETA decays linearly toward zero as the lock approaches expiry.
 /// @dev    Follows the Curve veCRV model (simplified). Unlock times are rounded
 ///         down to whole weeks for cleaner epoch alignment in Phase 2.
 contract MetaStake is ReentrancyGuard {
-    using SafeERC20 for IERC20;
-
     // ── Immutables ───────────────────────────────────────────────────────
-    IERC20 public immutable META;
     uint256 public immutable MAX_LOCK;
 
     // ── Constants ────────────────────────────────────────────────────────
@@ -45,47 +40,43 @@ contract MetaStake is ReentrancyGuard {
     error LockExpired();
     error LockNotExpired();
     error UnlockTimeTooEarly();
+    error TransferFailed();
 
     // ── Constructor ──────────────────────────────────────────────────────
-    /// @param meta_ Address of the META ERC-20 token
     /// @param maxLock_ Maximum lock duration in seconds (e.g. 365 days)
-    constructor(address meta_, uint256 maxLock_) {
-        META = IERC20(meta_);
+    constructor(uint256 maxLock_) {
         MAX_LOCK = maxLock_;
     }
 
     // ── Write ────────────────────────────────────────────────────────────
 
-    /// @notice Create a new lock.
-    /// @param amount META tokens to lock (must be pre-approved).
+    /// @notice Create a new lock by sending native META.
     /// @param duration Lock duration in seconds (MIN_LOCK ≤ duration ≤ MAX_LOCK).
-    function createLock(uint256 amount, uint256 duration) external nonReentrant {
-        if (amount == 0) revert ZeroAmount();
+    function createLock(uint256 duration) external payable nonReentrant {
+        if (msg.value == 0) revert ZeroAmount();
         if (duration < MIN_LOCK) revert LockTooShort();
         if (duration > MAX_LOCK) revert LockTooLong();
         if (locks[msg.sender].amount != 0) revert LockExists();
 
         uint256 unlockTime = _roundToWeek(block.timestamp + duration);
 
-        locks[msg.sender] = Lock({amount: amount, unlockTime: unlockTime});
-        totalLocked += amount;
+        locks[msg.sender] = Lock({amount: msg.value, unlockTime: unlockTime});
+        totalLocked += msg.value;
 
-        META.safeTransferFrom(msg.sender, address(this), amount);
-        emit Locked(msg.sender, amount, unlockTime);
+        emit Locked(msg.sender, msg.value, unlockTime);
     }
 
     /// @notice Add more META to an existing (non-expired) lock.
-    function increaseAmount(uint256 amount) external nonReentrant {
-        if (amount == 0) revert ZeroAmount();
+    function increaseAmount() external payable nonReentrant {
+        if (msg.value == 0) revert ZeroAmount();
         Lock storage lock = locks[msg.sender];
         if (lock.amount == 0) revert NoLock();
         if (block.timestamp >= lock.unlockTime) revert LockExpired();
 
-        lock.amount += amount;
-        totalLocked += amount;
+        lock.amount += msg.value;
+        totalLocked += msg.value;
 
-        META.safeTransferFrom(msg.sender, address(this), amount);
-        emit AmountIncreased(msg.sender, amount, lock.amount);
+        emit AmountIncreased(msg.sender, msg.value, lock.amount);
     }
 
     /// @notice Extend lock to a new unlock time (must be strictly later than current).
@@ -114,7 +105,9 @@ contract MetaStake is ReentrancyGuard {
         totalLocked -= amount;
         delete locks[msg.sender];
 
-        META.safeTransfer(msg.sender, amount);
+        (bool ok,) = msg.sender.call{value: amount}("");
+        if (!ok) revert TransferFailed();
+
         emit Withdrawn(msg.sender, amount);
     }
 
