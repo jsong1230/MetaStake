@@ -174,6 +174,7 @@ export default function Home() {
         <div className="max-w-6xl mx-auto flex items-center justify-between text-xs text-zinc-600">
           <span>Metadium Testnet &middot; Chain ID 12</span>
           <div className="flex gap-4">
+            <a href="/manual" className="hover:text-zinc-400 transition">Manual</a>
             <a href="https://github.com/jsong1230/MetaStake" className="hover:text-zinc-400 transition" target="_blank" rel="noopener noreferrer">GitHub</a>
             <a href="https://api.metadium.com/dev" className="hover:text-zinc-400 transition" target="_blank" rel="noopener noreferrer">RPC</a>
           </div>
