@@ -17,6 +17,11 @@ export function RewardsPanel() {
     abi: FeeDistributorABI,
     functionName: "currentEpoch",
   });
+  const { data: startTime } = useReadContract({
+    address: ADDRESSES.FeeDistributor,
+    abi: FeeDistributorABI,
+    functionName: "startTime",
+  });
 
   const epoch = currentEpoch ? Number(currentEpoch) : 0;
 
@@ -35,9 +40,12 @@ export function RewardsPanel() {
   });
 
   const { writeContract, data: txHash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash: txHash,
-  });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const busy = isPending || isConfirming;
+
+  const epochFees = epoch0 ? (epoch0 as [bigint, bigint, bigint, boolean])[0] : 0n;
+  const epochCheckpointed = epoch0 ? (epoch0 as [bigint, bigint, bigint, boolean])[3] : false;
+  const nextEpochStart = startTime ? Number(startTime) + (epoch + 1) * 604800 : 0;
 
   const handleCheckpoint = () => {
     if (epoch === 0) return;
@@ -59,56 +67,87 @@ export function RewardsPanel() {
     });
   };
 
-  if (!address) {
-    return <p className="text-gray-500 text-center py-8">Connect wallet to view rewards</p>;
-  }
-
-  const epochFees = epoch0 ? (epoch0 as [bigint, bigint, bigint, boolean])[0] : 0n;
-  const epochCheckpointed = epoch0 ? (epoch0 as [bigint, bigint, bigint, boolean])[3] : false;
-
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-gray-800 rounded-xl p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Current Epoch</p>
-          <p className="text-xl font-bold mt-1">{epoch}</p>
+    <div className="space-y-5">
+      {/* Epoch info — always visible */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="stat-card rounded-xl p-4">
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Current Epoch</p>
+          <p className="text-2xl font-bold text-zinc-100 mt-1">{epoch}</p>
         </div>
-        <div className="bg-gray-800 rounded-xl p-4">
-          <p className="text-xs text-gray-400 uppercase tracking-wide">Epoch 0 Fees</p>
-          <p className="text-xl font-bold mt-1">
-            {Number(formatEther(epochFees)).toFixed(4)} META
+        <div className="stat-card rounded-xl p-4">
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Epoch 0 Fees</p>
+          <p className="text-2xl font-bold text-zinc-100 mt-1">{Number(formatEther(epochFees)).toFixed(2)}</p>
+          <p className="text-[10px] text-zinc-600 mt-0.5">META collected</p>
+        </div>
+        <div className="stat-card rounded-xl p-4">
+          <p className="text-[10px] text-zinc-500 uppercase tracking-wider">Next Epoch</p>
+          <p className="text-sm font-bold text-zinc-100 mt-1">
+            {nextEpochStart ? new Date(nextEpochStart * 1000).toLocaleDateString() : "-"}
           </p>
+          <p className="text-[10px] text-zinc-600 mt-0.5">Weekly cycle</p>
         </div>
       </div>
 
-      <div className="bg-gray-800 rounded-xl p-5 space-y-4">
-        <h3 className="font-semibold text-lg">Claimable Rewards</h3>
-        <p className="text-3xl font-bold text-green-400">
-          {claimable ? Number(formatEther(claimable as bigint)).toFixed(4) : "0.0000"} META
-        </p>
+      {/* How it works — always visible */}
+      <div className="bg-zinc-800/30 border border-zinc-700/40 rounded-xl p-4">
+        <h4 className="text-xs font-medium text-zinc-400 mb-2">How Fee Distribution Works</h4>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          {[
+            { step: "1", title: "Collect", desc: "Services send fees each epoch" },
+            { step: "2", title: "Checkpoint", desc: "Anyone finalizes the epoch" },
+            { step: "3", title: "Claim", desc: "veMETA holders claim share" },
+          ].map((s) => (
+            <div key={s.step}>
+              <div className="w-6 h-6 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold flex items-center justify-center mx-auto">
+                {s.step}
+              </div>
+              <p className="text-xs font-medium text-zinc-300 mt-2">{s.title}</p>
+              <p className="text-[10px] text-zinc-500 mt-0.5">{s.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
-        <div className="flex gap-3">
-          {epoch > 0 && !epochCheckpointed && (
+      {!address ? (
+        <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-4 text-center">
+          <p className="text-zinc-400 text-sm">Connect wallet to claim rewards</p>
+        </div>
+      ) : (
+        <>
+          <div className="glow-card rounded-xl p-5">
+            <p className="text-xs text-zinc-400 mb-1">Your Claimable Rewards</p>
+            <p className="text-3xl font-bold gradient-text">
+              {claimable ? Number(formatEther(claimable as bigint)).toFixed(4) : "0.0000"}{" "}
+              <span className="text-base text-zinc-400">META</span>
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            {epoch > 0 && !epochCheckpointed && (
+              <button
+                onClick={handleCheckpoint}
+                disabled={busy}
+                className="flex-1 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-700 py-2.5 rounded-xl text-sm font-medium transition-all"
+              >
+                {busy ? "..." : `Checkpoint Epoch ${epoch - 1}`}
+              </button>
+            )}
             <button
-              onClick={handleCheckpoint}
-              disabled={isPending || isConfirming}
-              className="flex-1 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 py-2.5 rounded-lg font-medium transition"
+              onClick={handleClaim}
+              disabled={busy || !claimable || (claimable as bigint) === 0n}
+              className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 py-2.5 rounded-xl text-sm font-medium transition-all"
             >
-              {isPending || isConfirming ? "..." : `Checkpoint Epoch ${epoch - 1}`}
+              {busy ? "Confirming..." : "Claim Rewards"}
             </button>
-          )}
-          <button
-            onClick={handleClaim}
-            disabled={isPending || isConfirming || !claimable || (claimable as bigint) === 0n}
-            className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 py-2.5 rounded-lg font-medium transition"
-          >
-            {isPending || isConfirming ? "Confirming..." : "Claim"}
-          </button>
-        </div>
-      </div>
+          </div>
+        </>
+      )}
 
       {isSuccess && (
-        <p className="text-green-400 text-sm text-center">Transaction confirmed!</p>
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-4 py-2 text-sm text-emerald-400 text-center">
+          Transaction confirmed
+        </div>
       )}
     </div>
   );

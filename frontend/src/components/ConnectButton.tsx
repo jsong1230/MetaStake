@@ -15,7 +15,7 @@ export function ConnectButton() {
     return (
       <button
         onClick={() => connect({ connector: injected(), chainId: metadiumTestnet.id })}
-        className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg font-medium transition"
+        className="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-lg font-medium text-sm transition-all shadow-lg shadow-blue-600/20"
       >
         Connect Wallet
       </button>
@@ -23,13 +23,16 @@ export function ConnectButton() {
   }
 
   return (
-    <div className="flex items-center gap-3">
-      <span className="text-sm text-gray-400">
-        {balance ? `${Number(formatEther(balance.value)).toFixed(2)} META` : "..."}
-      </span>
+    <div className="flex items-center gap-2">
+      <div className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm">
+        <span className="text-zinc-400">
+          {balance ? `${Number(formatEther(balance.value)).toFixed(2)}` : "..."}{" "}
+        </span>
+        <span className="text-zinc-300 font-medium">META</span>
+      </div>
       <button
         onClick={() => disconnect()}
-        className="bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg text-sm font-mono transition"
+        className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3 py-1.5 rounded-lg text-sm font-mono text-zinc-300 transition-all"
       >
         {address?.slice(0, 6)}...{address?.slice(-4)}
       </button>

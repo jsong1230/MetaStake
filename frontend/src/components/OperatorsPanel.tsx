@@ -11,39 +11,36 @@ import { parseEther, formatEther } from "viem";
 import { OperatorRegistryABI, ADDRESSES } from "@/lib/contracts";
 
 const SERVICES = [
-  { id: 0, name: "zkBridge Relayer", min: "10", slash: "10%" },
-  { id: 1, name: "Dispute Resolver", min: "20", slash: "20%" },
-  { id: 2, name: "Agent Verifier", min: "10", slash: "5%" },
+  { id: 0, name: "zkBridge Relayer", min: "10", slash: "10%", desc: "Submit ZK proofs on-chain" },
+  { id: 1, name: "Dispute Resolver", min: "20", slash: "20%", desc: "Resolve MetaPool disputes" },
+  { id: 2, name: "Agent Verifier", min: "10", slash: "5%", desc: "Verify meta-agents identity" },
 ];
 
-function ServiceCard({ serviceId, address: userAddr }: { serviceId: number; address: string }) {
-  const svc = SERVICES[serviceId];
+function ServiceCard({ svc, userAddr }: { svc: typeof SERVICES[0]; userAddr: string | undefined }) {
   const [stakeAmount, setStakeAmount] = useState(svc.min);
 
   const { data: op, refetch } = useReadContract({
     address: ADDRESSES.OperatorRegistry,
     abi: OperatorRegistryABI,
     functionName: "getOperator",
-    args: [BigInt(serviceId), userAddr as `0x${string}`],
+    args: userAddr ? [BigInt(svc.id), userAddr as `0x${string}`] : undefined,
   });
 
   const { data: opCount } = useReadContract({
     address: ADDRESSES.OperatorRegistry,
     abi: OperatorRegistryABI,
     functionName: "operatorCount",
-    args: [BigInt(serviceId)],
+    args: [BigInt(svc.id)],
   });
 
   const { writeContract, data: txHash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
-    hash: txHash,
-  });
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash: txHash });
+  const busy = isPending || isConfirming;
 
   const opData = op as [bigint, bigint, boolean] | undefined;
   const isOperator = opData?.[2] ?? false;
   const stake = opData?.[0] ?? 0n;
-  const unstakeReq = opData?.[1] ?? 0n;
-  const hasUnstakeRequest = unstakeReq > 0n;
+  const hasUnstakeRequest = (opData?.[1] ?? 0n) > 0n;
 
   const handleStake = () => {
     writeContract(
@@ -51,7 +48,7 @@ function ServiceCard({ serviceId, address: userAddr }: { serviceId: number; addr
         address: ADDRESSES.OperatorRegistry,
         abi: OperatorRegistryABI,
         functionName: "stake",
-        args: [BigInt(serviceId)],
+        args: [BigInt(svc.id)],
         value: parseEther(stakeAmount),
       },
       { onSuccess: () => setTimeout(refetch, 3000) }
@@ -64,7 +61,7 @@ function ServiceCard({ serviceId, address: userAddr }: { serviceId: number; addr
         address: ADDRESSES.OperatorRegistry,
         abi: OperatorRegistryABI,
         functionName: "requestUnstake",
-        args: [BigInt(serviceId)],
+        args: [BigInt(svc.id)],
       },
       { onSuccess: () => setTimeout(refetch, 3000) }
     );
@@ -76,84 +73,76 @@ function ServiceCard({ serviceId, address: userAddr }: { serviceId: number; addr
         address: ADDRESSES.OperatorRegistry,
         abi: OperatorRegistryABI,
         functionName: "withdraw",
-        args: [BigInt(serviceId)],
+        args: [BigInt(svc.id)],
       },
       { onSuccess: () => setTimeout(refetch, 3000) }
     );
   };
 
-  const busy = isPending || isConfirming;
-
   return (
-    <div className="bg-gray-800 rounded-xl p-5 space-y-3">
+    <div className="stat-card rounded-xl p-5 space-y-3">
       <div className="flex justify-between items-start">
         <div>
-          <h3 className="font-semibold">{svc.name}</h3>
-          <p className="text-xs text-gray-400">
-            Min: {svc.min} META | Slash: {svc.slash} | Operators: {opCount?.toString() ?? "0"}
-          </p>
+          <h3 className="font-semibold text-zinc-100">{svc.name}</h3>
+          <p className="text-xs text-zinc-500 mt-0.5">{svc.desc}</p>
         </div>
         {isOperator && (
-          <span className="bg-green-900 text-green-300 text-xs px-2 py-1 rounded">Active</span>
+          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px] px-2 py-0.5 rounded font-medium">
+            Active
+          </span>
         )}
       </div>
 
-      {isOperator ? (
+      <div className="flex gap-4 text-xs">
+        <span className="text-zinc-500">Min: <span className="text-zinc-300">{svc.min} META</span></span>
+        <span className="text-zinc-500">Slash: <span className="text-red-400">{svc.slash}</span></span>
+        <span className="text-zinc-500">Operators: <span className="text-zinc-300">{opCount?.toString() ?? "0"}</span></span>
+      </div>
+
+      {!userAddr ? (
+        <div className="bg-zinc-800/30 rounded-lg px-3 py-2 text-center">
+          <p className="text-zinc-500 text-xs">Connect wallet to become an operator</p>
+        </div>
+      ) : isOperator ? (
         <div className="space-y-2">
-          <p className="text-sm">
-            Staked: <span className="font-mono text-blue-400">{Number(formatEther(stake)).toFixed(2)} META</span>
-          </p>
+          <div className="bg-zinc-800/50 rounded-lg px-3 py-2 flex justify-between text-sm">
+            <span className="text-zinc-400">Your Stake</span>
+            <span className="font-mono font-medium text-blue-400">{Number(formatEther(stake)).toFixed(1)} META</span>
+          </div>
           {!hasUnstakeRequest ? (
-            <button
-              onClick={handleRequestUnstake}
-              disabled={busy}
-              className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 py-2 rounded-lg text-sm font-medium transition"
-            >
+            <button onClick={handleRequestUnstake} disabled={busy}
+              className="w-full bg-amber-600/80 hover:bg-amber-500 disabled:bg-zinc-700 py-2 rounded-lg text-xs font-medium transition-all">
               {busy ? "..." : "Request Unstake (7d cooldown)"}
             </button>
           ) : (
-            <button
-              onClick={handleWithdraw}
-              disabled={busy}
-              className="w-full bg-red-600 hover:bg-red-700 disabled:bg-gray-600 py-2 rounded-lg text-sm font-medium transition"
-            >
-              {busy ? "..." : "Withdraw"}
+            <button onClick={handleWithdraw} disabled={busy}
+              className="w-full bg-red-600/80 hover:bg-red-500 disabled:bg-zinc-700 py-2 rounded-lg text-xs font-medium transition-all">
+              {busy ? "..." : "Withdraw Stake"}
             </button>
           )}
         </div>
       ) : stake > 0n ? (
-        // Deactivated (slashed) — can withdraw remaining
         <div className="space-y-2">
-          <p className="text-sm text-yellow-400">
-            Deactivated — {Number(formatEther(stake)).toFixed(2)} META remaining
-          </p>
-          <button
-            onClick={handleWithdraw}
-            disabled={busy}
-            className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 py-2 rounded-lg text-sm font-medium transition"
-          >
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-xs text-amber-400">
+            Deactivated — {Number(formatEther(stake)).toFixed(1)} META remaining
+          </div>
+          <button onClick={handleWithdraw} disabled={busy}
+            className="w-full bg-amber-600/80 hover:bg-amber-500 disabled:bg-zinc-700 py-2 rounded-lg text-xs font-medium transition-all">
             {busy ? "..." : "Withdraw Remaining"}
           </button>
         </div>
       ) : (
         <div className="flex gap-2">
-          <input
-            type="number"
-            value={stakeAmount}
-            onChange={(e) => setStakeAmount(e.target.value)}
+          <input type="number" value={stakeAmount} onChange={(e) => setStakeAmount(e.target.value)}
             min={svc.min}
-            className="flex-1 bg-gray-700 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleStake}
-            disabled={busy}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 px-4 py-2 rounded-lg font-medium transition"
-          >
+            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition text-zinc-100 text-sm" />
+          <button onClick={handleStake} disabled={busy}
+            className="bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 px-4 py-2 rounded-lg text-sm font-medium transition-all">
             {busy ? "..." : "Stake"}
           </button>
         </div>
       )}
-      {isSuccess && <p className="text-green-400 text-xs">Confirmed!</p>}
+      {isSuccess && <p className="text-emerald-400 text-xs text-center">Confirmed!</p>}
     </div>
   );
 }
@@ -161,14 +150,16 @@ function ServiceCard({ serviceId, address: userAddr }: { serviceId: number; addr
 export function OperatorsPanel() {
   const { address } = useAccount();
 
-  if (!address) {
-    return <p className="text-gray-500 text-center py-8">Connect wallet to manage operators</p>;
-  }
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      <div className="bg-zinc-800/30 border border-zinc-700/40 rounded-xl p-4">
+        <h4 className="text-xs font-medium text-zinc-400 mb-1">Service Operator Staking</h4>
+        <p className="text-[11px] text-zinc-500 leading-relaxed">
+          Operators stake META to run ecosystem services. Misbehaviour triggers slashing. Slashed META goes to the treasury.
+        </p>
+      </div>
       {SERVICES.map((svc) => (
-        <ServiceCard key={svc.id} serviceId={svc.id} address={address} />
+        <ServiceCard key={svc.id} svc={svc} userAddr={address} />
       ))}
     </div>
   );
